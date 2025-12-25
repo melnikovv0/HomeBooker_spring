@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>My Bookings</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+</head>
+<body class="bg-light">
+<div class="container mt-5">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h2>My Reservations</h2>
+            <p class="text-muted mb-0">Logged in as <strong id="usernameDisplay"></strong></p>
+        </div>
+        <div class="d-flex gap-2">
+            <a href="guest-dashboard.html" class="btn btn-outline-primary">Back to Dashboard</a>
+            <button class="btn btn-outline-secondary" onclick="logout()">Logout</button>
+        </div>
+    </div>
+
+    <table class="table table-bordered table-hover">
+        <thead class="table-light">
+        <tr>
+            <th>Accommodation</th>
+            <th>Location</th>
+            <th>Start Date</th>
+            <th>End Date</th>
+            <th>Total (€)</th>
+            <th>Action</th>
+        </tr>
+        </thead>
+        <tbody id="reservationTable"></tbody>
+    </table>
+</div>
+
+<script>
+    const user = JSON.parse(localStorage.getItem('user'));
+    if (!user || user.role !== 'GUEST') {
+        window.location.href = 'login.html';
+    }
+
+    document.getElementById('usernameDisplay').textContent = user.username;
+
+    async function fetchMyReservations() {
+        const res = await fetch('http://localhost:9081/reservations');
+        const all = await res.json();
+        const my = all.filter(r => r.guest.id === user.id);
+
+        const table = document.getElementById('reservationTable');
+        table.innerHTML = '';
+
+        my.forEach(r => {
+            const start = new Date(r.startDate);
+            const end = new Date(r.endDate);
+            const nights = Math.ceil((end - start) / (1000 * 60 * 60 * 24));
+            const total = nights * r.accommodation.price;
+
+            const row = document.createElement('tr');
+            row.innerHTML = `
+                <td>${r.accommodation.name}</td>
+                <td>${r.accommodation.location}</td>
+                <td>${r.startDate}</td>
+                <td>${r.endDate}</td>
+                <td>€${total}</td>
+                <td>
+                    <button class="btn btn-sm btn-danger" onclick="cancelReservation(${r.id})">Cancel</button>
+                </td>
+            `;
+            table.appendChild(row);
+        });
+    }
+
+    async function cancelReservation(id) {
+        if (confirm("Cancel this booking?")) {
+            await fetch(`http://localhost:9081/reservations/${id}`, { method: 'DELETE' });
+            fetchMyReservations();
+        }
+    }
+
+    function logout() {
+        localStorage.removeItem('user');
+        window.location.href = 'login.html';
+    }
+
+    fetchMyReservations();
+</script>
+</body>
+</html>

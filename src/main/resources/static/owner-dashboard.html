@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>HomeBooker - Owner Dashboard</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+</head>
+<body class="bg-light">
+<div class="container mt-5">
+  <div class="d-flex justify-content-between align-items-center mb-4">
+    <div>
+      <h2>My Accommodations</h2>
+      <p class="text-muted mb-0">Logged in as <strong id="usernameDisplay"></strong></p>
+    </div>
+    <div class="d-flex align-items-center gap-2">
+      <a href="owner-reservations.html" class="btn btn-info">View My Reservations</a>
+      <button class="btn btn-outline-secondary" onclick="logout()">Logout</button>
+    </div>
+  </div>
+
+  <button class="btn btn-primary mb-4" onclick="openAddModal()">Add New Accommodation</button>
+  <div class="row" id="accommodationsContainer"></div>
+</div>
+
+<!-- Add/Edit Modal -->
+<div class="modal fade" id="accommodationModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">Accommodation Form</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <form id="accommodationForm">
+          <input type="hidden" id="accommodationId">
+          <div class="mb-3">
+            <label for="name" class="form-label">Name</label>
+            <input type="text" class="form-control" id="name" required>
+          </div>
+          <div class="mb-3">
+            <label for="description" class="form-label">Description</label>
+            <textarea class="form-control" id="description" required></textarea>
+          </div>
+          <div class="mb-3">
+            <label for="location" class="form-label">Location</label>
+            <input type="text" class="form-control" id="location" required>
+          </div>
+          <div class="mb-3">
+            <label for="price" class="form-label">Price</label>
+            <input type="number" class="form-control" id="price" required>
+          </div>
+
+          <div class="mb-3">
+            <label for="imageUrl" class="form-label">Image URL</label>
+            <input type="text" class="form-control" id="imageUrl" placeholder="https://..." required>
+          </div>
+          <button type="submit" class="btn btn-success">Save</button>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+<script>
+  const user = JSON.parse(localStorage.getItem('user'));
+  if (!user || user.role !== 'OWNER') {
+    window.location.href = 'login.html';
+  }
+  document.getElementById('usernameDisplay').textContent = user.username;
+
+  async function fetchAccommodations() {
+    const response = await fetch('http://localhost:9081/accommodations');
+    const data = await response.json();
+    const container = document.getElementById('accommodationsContainer');
+    container.innerHTML = '';
+
+    data.filter(acc => acc.owner.id === user.id).forEach(acc => {
+      const card = document.createElement('div');
+      card.className = 'col-md-4';
+      card.innerHTML = `
+          <div class="card mb-4 shadow-sm">
+            <img src="${acc.imageUrl}" class="card-img-top" alt="Accommodation Image" style="height: 200px; object-fit: cover;">
+            <div class="card-body">
+              <h5 class="card-title">${acc.name}</h5>
+              <p class="card-text">${acc.description}</p>
+              <p><strong>Location:</strong> ${acc.location}</p>
+              <p><strong>Price:</strong> €${acc.price}</p>
+              <button class="btn btn-sm btn-warning me-2" onclick='editAccommodation(${JSON.stringify(acc)})'>Edit</button>
+              <button class="btn btn-sm btn-danger" onclick='deleteAccommodation(${acc.id})'>Delete</button>
+            </div>
+          </div>
+        `;
+      container.appendChild(card);
+    });
+  }
+
+  function openAddModal() {
+    document.getElementById('accommodationId').value = '';
+    document.getElementById('name').value = '';
+    document.getElementById('description').value = '';
+    document.getElementById('location').value = '';
+    document.getElementById('price').value = '';
+    document.getElementimageUrlById('imageUrl').value = '';
+    new bootstrap.Modal(document.getElementById('accommodationModal')).show();
+  }
+
+  function editAccommodation(acc) {
+    document.getElementById('accommodationId').value = acc.id;
+    document.getElementById('name').value = acc.name;
+    document.getElementById('description').value = acc.description;
+    document.getElementById('location').value = acc.location;
+    document.getElementById('price').value = acc.price;
+    document.getElementById('imageUrl').value = acc.imageUrl || '';
+    new bootstrap.Modal(document.getElementById('accommodationModal')).show();
+  }
+
+  async function deleteAccommodation(id) {
+    if (confirm('Are you sure you want to delete this accommodation?')) {
+      await fetch(`http://localhost:9081/accommodations/${id}`, { method: 'DELETE' });
+      fetchAccommodations();
+    }
+  }
+
+  document.getElementById('accommodationForm').addEventListener('submit', async function(e) {
+    e.preventDefault();
+    const id = document.getElementById('accommodationId').value;
+    const accommodation = {
+      name: document.getElementById('name').value,
+      description: document.getElementById('description').value,
+      location: document.getElementById('location').value,
+      price: document.getElementById('price').value,
+      imageUrl: document.getElementById('imageUrl').value,
+      owner: { id: user.id }
+    };
+
+    const url = id ? `http://localhost:9081/accommodations/${id}` : 'http://localhost:9081/accommodations';
+    const method = id ? 'PUT' : 'POST';
+
+    await fetch(url, {
+      method,
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(accommodation)
+    });
+
+    bootstrap.Modal.getInstance(document.getElementById('accommodationModal')).hide();
+    fetchAccommodations();
+  });
+
+  function logout() {
+    localStorage.removeItem('user');
+    window.location.href = 'login.html';
+  }
+
+  fetchAccommodations();
+</script>
+</body>
+</html>
